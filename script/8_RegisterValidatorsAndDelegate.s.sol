@@ -6,21 +6,16 @@ import {IValidatorRegistry} from "../src/interfaces/IValidatorRegistry.sol";
 
 import {ERC20PresetFixedSupply} from "@openzeppelin/contracts/token/ERC20/presets/ERC20PresetFixedSupply.sol";
 
+import {BaseScript} from "./BaseScript.sol";
 import "forge-std/Script.sol";
 
-// This script does not intentionally inherit from BaseScript, since
-// that script has boilerplate that is not needed here.
-contract RegisterValidatorsAndDelegate is Script {
+contract RegisterValidatorsAndDelegate is BaseScript {
 
-    uint256 primaryKey;
     // registration data for validators
     uint256[] validatorKeys;
     string[] exoAddresses;
     string[] names;
     bytes32[] consKeys;
-    // rpc settings
-    string clientChainRPCURL;
-    uint256 clientChain;
     // addresses of contracts
     address bootstrapAddr;
     address tokenAddr;
@@ -32,22 +27,21 @@ contract RegisterValidatorsAndDelegate is Script {
         [1000 * 1e18, 0 * 1e18, 0 * 1e18, 2000 * 1e18]
     ];
 
-    function setUp() public {
-        primaryKey = vm.envUint("TEST_ACCOUNT_THREE_PRIVATE_KEY");
+    function setUp() public virtual override {
+        super.setUp();
+
+        // These environment variables are exclusive to this file and hence are not loaded in the BaseScript
         validatorKeys = vm.envUint("VALIDATOR_KEYS", ",");
         exoAddresses = vm.envString("EXO_ADDRESSES", ",");
         names = vm.envString("NAMES", ",");
         consKeys = vm.envBytes32("CONS_KEYS", ",");
-
-        clientChainRPCURL = vm.envString("SEPOLIA_RPC");
-        clientChain = vm.createSelectFork(clientChainRPCURL);
-
         require(
             validatorKeys.length == exoAddresses.length && validatorKeys.length == names.length
                 && validatorKeys.length == consKeys.length,
             "Validator registration data length mismatch"
         );
 
+        // Load the contracts that were deployed in 7_DeployBootstrapOnly.s.sol
         string memory deployedContracts = vm.readFile("script/deployedBootstrapOnly.json");
         bootstrapAddr = stdJson.readAddress(deployedContracts, ".clientChain.bootstrap");
         require(bootstrapAddr != address(0), "Bootstrap address should not be empty");
@@ -57,10 +51,15 @@ contract RegisterValidatorsAndDelegate is Script {
 
     function run() public {
         vm.selectFork(clientChain);
+        // TODO: load commission from environment variables instead of using the default value
+        // At this point, it does not matter since our reward distribution module isn't in place
+        // yet. However, the next upgrade will for sure include some form of it.
         IValidatorRegistry.Commission memory commission = IValidatorRegistry.Commission(0, 1e18, 1e18);
         Bootstrap bootstrap = Bootstrap(bootstrapAddr);
+        require(!bootstrap.bootstrapped(), "Bootstrap contract is already bootstrapped");
         ERC20PresetFixedSupply token = ERC20PresetFixedSupply(tokenAddr);
         address vaultAddr = address(bootstrap.tokenToVault(tokenAddr));
+
         for (uint256 i = 0; i < validatorKeys.length; i++) {
             uint256 pk = validatorKeys[i];
             address addr = vm.addr(pk);
@@ -72,8 +71,8 @@ contract RegisterValidatorsAndDelegate is Script {
             // register validator
             bootstrap.registerValidator(exoAddr, name, commission, consKey);
             vm.stopBroadcast();
-            // give them the balance
-            vm.startBroadcast(primaryKey);
+            // give them the balance from exocoreValidatorSet
+            vm.startBroadcast(exocoreValidatorSet.privateKey);
             uint256 depositAmount = 0;
             for (uint256 j = 0; j < amounts[i].length; j++) {
                 depositAmount += amounts[i][j];
