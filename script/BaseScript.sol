@@ -94,7 +94,7 @@ contract BaseScript is Script {
         console.log("NOTICE: using exocore precompiles mock", useExocorePrecompileMock);
 
         clientChainRPCURL = vm.envString("CLIENT_CHAIN_RPC");
-        exocoreRPCURL = vm.envString("EXOCORE_TESETNET_RPC");
+        exocoreRPCURL = vm.envString("EXOCORE_TESTNET_RPC");
     }
 
     function _deployBeaconOracle() internal returns (EigenLayerBeaconOracle) {

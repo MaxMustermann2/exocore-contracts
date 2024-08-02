@@ -86,7 +86,7 @@ contract SetPeersAndUpgrade is BaseScript {
         // because that parameter is not involved in this process.
         console.log("Cross-chain upgrade command:");
         console.log(
-            "source .env && cast send --rpc-url $EXOCORE_TESETNET_RPC",
+            "source .env && cast send --rpc-url $EXOCORE_TESTNET_RPC",
             exocoreGatewayAddr,
             '"markBootstrapOnAllChains()"',
             "--private-key $TEST_ACCOUNT_THREE_PRIVATE_KEY"
