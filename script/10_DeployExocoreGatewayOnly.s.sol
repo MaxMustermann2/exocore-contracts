@@ -10,6 +10,8 @@ import {ExocoreGateway} from "../src/core/ExocoreGateway.sol";
 import {BaseScript} from "./BaseScript.sol";
 import "forge-std/Script.sol";
 
+import {NonShortCircuitEndpointV2Mock} from "test/mocks/NonShortCircuitEndpointV2Mock.sol";
+
 contract DeployExocoreGatewayOnly is BaseScript {
 
     function setUp() public virtual override {
@@ -26,6 +28,11 @@ contract DeployExocoreGatewayOnly is BaseScript {
     function run() public {
         vm.selectFork(exocore);
         vm.startBroadcast(deployer.privateKey);
+
+        // for localnet testing deploy this contract
+        if (useEndpointMock) {
+            exocoreLzEndpoint = new NonShortCircuitEndpointV2Mock(exocoreChainId, exocoreValidatorSet.addr);
+        }
 
         ProxyAdmin exocoreProxyAdmin = new ProxyAdmin();
         ExocoreGateway exocoreGatewayLogic = new ExocoreGateway(address(exocoreLzEndpoint));
