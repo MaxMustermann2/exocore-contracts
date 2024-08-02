@@ -25,7 +25,7 @@ contract SetBootstrapTime is BaseScript {
 
         Bootstrap bootstrap = Bootstrap(bootstrapAddr);
         // edit this value before running!
-        bootstrap.setSpawnTime(block.timestamp + 120 seconds);
+        bootstrap.setSpawnTime(block.timestamp + 24*7 hours);
 
         vm.stopBroadcast();
     }
