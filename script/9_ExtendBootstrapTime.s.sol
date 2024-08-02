@@ -24,6 +24,7 @@ contract SetBootstrapTime is BaseScript {
         vm.startBroadcast(exocoreValidatorSet.privateKey);
 
         Bootstrap bootstrap = Bootstrap(bootstrapAddr);
+        // edit this value before running!
         bootstrap.setSpawnTime(block.timestamp + 120 seconds);
 
         vm.stopBroadcast();
