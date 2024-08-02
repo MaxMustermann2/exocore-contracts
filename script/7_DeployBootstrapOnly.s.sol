@@ -94,6 +94,9 @@ contract DeployBootstrapOnly is BaseScript {
         bytes memory initialization =
             abi.encodeWithSelector(clientGatewayLogic.initialize.selector, exocoreValidatorSet.addr, emptyList);
         bootstrap.setClientChainGatewayLogic(address(clientGatewayLogic), initialization);
+        // the bootstrap contract does not send out any LZ messages, and hence,
+        // the setDestLzEndpoint function does not need to be called, even if
+        // `useEndpointMock` is true.
 
         vm.stopBroadcast();
 
