@@ -1,0 +1,84 @@
+name: Update CI Status Comment
+
+on:
+  workflow_call:
+    inputs:
+      workflow_conclusion:
+        description: 'The conclusion of the parent workflow (success or failure)'
+        required: true
+        type: string
+      workflow_url:
+        description: 'The URL to the parent workflow run'
+        required: true
+        type: string
+      workflow_name:
+        description: 'The name of the CI workflow that triggered this update'
+        required: true
+        type: string
+    secrets:
+      GITHUB_TOKEN:
+        required: true
+
+jobs:
+  comment_on_status:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      issues: read
+
+    steps:
+      - name: Comment on Pull Requests
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pullRequests = context.payload.pull_requests || [];
+            const workflowConclusion = inputs.workflow_conclusion;
+            const workflowRunUrl = inputs.workflow_url;
+            const workflowName = inputs.workflow_name;
+
+            if (pullRequests.length === 0) {
+              console.log('No pull requests associated with this workflow run.');
+            } else {
+              for (const pr of pullRequests) {
+                try {
+                  // Get existing comments
+                  const existingComments = await github.rest.issues.listComments({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: pr.number,
+                  });
+
+                  // Find existing failure comment for the specified workflow
+                  const failureComment = existingComments.data.find(comment => 
+                    comment.body.includes(`⚠️ The ${workflowName} workflow has failed!`)
+                  );
+
+                  if (failureComment) {
+                    if (workflowConclusion === 'failure') {
+                      console.log(`Comment already exists for PR #${pr.number} for ${workflowName}, skipping new comment.`);
+                    } else {
+                      // Edit existing comment to strike it out if workflow succeeded
+                      await github.rest.issues.updateComment({
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        comment_id: failureComment.id,
+                        body: `~~⚠️ The ${workflowName} workflow has failed! Please check the [workflow run](${workflowRunUrl}) for detailed error logs.~~\n\n✅ The issue has been resolved.`
+                      });
+                      console.log(`Updated comment on PR #${pr.number} to indicate resolution for ${workflowName}.`);
+                    }
+                  } else if (workflowConclusion === 'failure') {
+                    // Create a new comment if the workflow failed
+                    await github.rest.issues.createComment({
+                      issue_number: pr.number,
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      body: `⚠️ The ${workflowName} workflow has failed! Please check the [workflow run](${workflowRunUrl}) for detailed error logs.`
+                    });
+                    console.log(`Commented on PR #${pr.number} for failure notification for ${workflowName}.`);
+                  }
+                } catch (error) {
+                  console.error(`Failed to comment or update PR #${pr.number}: ${error.message}`);
+                }
+              }
+            }

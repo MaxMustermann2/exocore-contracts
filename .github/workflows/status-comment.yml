@@ -1,0 +1,23 @@
+name: Comment the Forge CI status
+
+on:
+  workflow_run:
+    workflows: ["Forge CI"]
+    types:
+      - completed
+
+jobs:
+  comment_on_failure:
+    if: ${{ github.event.workflow_run.event == 'pull_request' }}
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      issues: read
+    steps:
+      - name: Update CI Status
+        uses: ./.github/workflows/comment.yml
+        with:
+          workflow_conclusion: ${{ github.event.workflow_run.conclusion }}
+          workflow_url: ${{ github.event.workflow_run.html_url }}
+          workflow_name: "Foundry CI"
+

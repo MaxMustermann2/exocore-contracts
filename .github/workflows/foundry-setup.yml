@@ -8,9 +8,6 @@ on:
         required: true
         type: string
     outputs:
-      installation-dir:
-        description: "The installation directory of Foundry toolchain"
-        value: ${{ jobs.setup.outputs.installation-dir }}
       cache-key:
         description: "The cache key for Foundry toolchain"
         value: ${{ jobs.setup.outputs.cache-key }}
@@ -39,9 +36,13 @@ jobs:
       - name: Cache the Foundry toolchain
         uses: actions/cache/save@v3
         with:
-          path: ${{ steps.find-path.outputs.installation-dir }}
-          key: ${{ runner.os }}-foundry-${{ inputs.foundry-version }}
+          path: |
+            - ${{ steps.find-path.outputs.installation-dir }}/anvil
+            - ${{ steps.find-path.outputs.installation-dir }}/cast
+            - ${{ steps.find-path.outputs.installation-dir }}/chisel
+            - ${{ steps.find-path.outputs.installation-dir }}/forge
+          key: foundry-${{ inputs.foundry-version }}
       - name: Set cache key
         id: set-cache-key
         run: |
-          echo "cache-key=${{ runner.os }}-foundry-${{ inputs.foundry-version }}" >> "$GITHUB_OUTPUT"
+          echo "cache-key=$foundry-${{ inputs.foundry-version }}" >> "$GITHUB_OUTPUT"
