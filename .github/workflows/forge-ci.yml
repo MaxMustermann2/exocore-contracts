@@ -19,6 +19,9 @@ jobs:
       pr-number: ${{ github.event.pull_request.number || 0 }}
 
   setup:
+    # delay the job until the cache job is completed, so that the
+    # status can be commented on the PR.
+    needs: cache
     # A full job can be used as a reusable workflow.
     # However, individual steps cannot call a reusable workflow.
     # Instead, they can call a composite action.

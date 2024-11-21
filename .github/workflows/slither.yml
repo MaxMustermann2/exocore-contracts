@@ -19,6 +19,9 @@ jobs:
       pr-number: ${{ github.event.pull_request.number || 0 }}
 
   analyze:
+    # delay the job until the cache job is completed, so that the
+    # status can be commented on the PR.
+    needs: cache
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
