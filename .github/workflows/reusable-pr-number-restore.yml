@@ -18,6 +18,11 @@ jobs:
     outputs:
       pr-number: ${{ steps.restore.outputs.pr-number }}
     steps:
+        # To use the correct cache scope, the checkout action must be used
+      - name: Checkout the specific commit
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ inputs.commit-hash }}
       - name: Restore the PR number cache
         uses: actions/cache/restore@v3
         with:
