@@ -29,7 +29,7 @@ jobs:
           echo "Workflow Run ID: ${{ github.event.workflow_run.id }}"
       # Checkout the repository to make the composite action available.
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         if: ${{ github.event.workflow_run.event == 'pull_request' }}
       - name: Restore the cached PR number, if available
         if: ${{ github.event.workflow_run.event == 'pull_request' }}
