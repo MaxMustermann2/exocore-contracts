@@ -7,15 +7,8 @@ on:
       - completed
 
 jobs:
-  restore:
-    name: Restore the cached PR number, if available
-    uses: ./.github/workflows/reusable-pr-number-restore.yml
-    with:
-      commit-hash: ${{ github.event.workflow_run.head_commit.id }}
-
   # The actual job to compare the storage layouts.
   compare_storage_layouts:
-    needs: restore
     runs-on: ubuntu-latest
 
     permissions:
@@ -40,11 +33,23 @@ jobs:
           echo "Workflow run URL: ${{ github.event.workflow_run.html_url }}"
           echo "Commit SHA: ${{ github.event.workflow_run.head_commit.id }}"
           echo "Workflow Run ID: ${{ github.event.workflow_run.id }}"
-          echo "PR number: ${{ needs.restore.outputs.pr-number }}"
       # For the composite action to be available, we must checkout the repository.
       # Later, the repository is used to run the compareLayouts.js script.
       - name: Checkout repository
         uses: actions/checkout@v3
+      - name: Restore the cached PR number, if available
+        if: ${{ github.event.workflow_run.event == 'pull_request' }}
+        uses: actions/cache/restore@v3
+        with:
+          key: pr-number-cache-${{ github.event.workflow_run.head_commit.id }}
+          path: res.txt
+      - name: Save the PR number to the outputs
+        id: restore
+        if: ${{ github.event.workflow_run.event == 'pull_request' }}
+        run: |
+          pr_number=$(cat res.txt)
+          echo "PR number: $pr_number"
+          echo "pr-number=$pr_number" >> "$GITHUB_OUTPUT"
       # The CI status needs to be posted explicitly because this
       # workflow is not triggered by a pull request, and hence,
       # the status is not visible under the "Checks" tab.
@@ -56,7 +61,7 @@ jobs:
           workflow-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           workflow-name: "Storage layout comparison"
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          pr-number: ${{ needs.restore.outputs.pr-number }}
+          pr-number: ${{ steps.restore.outputs.pr-number }}
       - name: Set commit status
         # trigger is no matter what, because the status should be updated
         if: always()
@@ -170,7 +175,7 @@ jobs:
           workflow-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           workflow-name: "Storage layout comparison"
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          pr-number: ${{ needs.restore.outputs.pr-number }}
+          pr-number: ${{ steps.restore.outputs.pr-number }}
       - name: Update parent commit status
         if: always()
         # if the outcome is not set, it will post failure

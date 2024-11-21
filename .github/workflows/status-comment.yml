@@ -13,15 +13,10 @@ permissions:
   contents: read
 
 jobs:
-  restore:
-    name: Restore the cached PR number, if available
-    uses: ./.github/workflows/reusable-pr-number-restore.yml
-    with:
-      commit-hash: ${{ github.event.workflow_run.head_commit.id }}
-
   comment_status:
-    needs: restore
     runs-on: ubuntu-latest
+    outputs:
+      pr-number: ${{ steps.restore.outputs.pr-number }}
     steps:
       # Log the workflow trigger details for debugging.
       - name: Echo workflow trigger details
@@ -32,11 +27,23 @@ jobs:
           echo "Workflow run URL: ${{ github.event.workflow_run.html_url }}"
           echo "Commit SHA: ${{ github.event.workflow_run.head_commit.id }}"
           echo "Workflow Run ID: ${{ github.event.workflow_run.id }}"
-          echo "PR number: ${{ needs.restore.outputs.pr-number }}"
       # Checkout the repository to make the composite action available.
       - name: Checkout repository
         uses: actions/checkout@v3
         if: ${{ github.event.workflow_run.event == 'pull_request' }}
+      - name: Restore the cached PR number, if available
+        if: ${{ github.event.workflow_run.event == 'pull_request' }}
+        uses: actions/cache/restore@v3
+        with:
+          key: pr-number-cache-${{ github.event.workflow_run.head_commit.id }}
+          path: res.txt
+      - name: Save the PR number to the outputs
+        id: restore
+        if: ${{ github.event.workflow_run.event == 'pull_request' }}
+        run: |
+          pr_number=$(cat res.txt)
+          echo "PR number: $pr_number"
+          echo "pr-number=$pr_number" >> "$GITHUB_OUTPUT"
       # Finally, run the composite action to post/update the status comment.
       - name: Update CI Status
         uses: ./.github/actions/composite-action-pr-status-comment
@@ -46,4 +53,4 @@ jobs:
           workflow-url: ${{ github.event.workflow_run.html_url }}
           workflow-name: ${{ github.event.workflow_run.name }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          pr-number: ${{ needs.restore.outputs.pr-number }}
+          pr-number: ${{ steps.restore.outputs.pr-number }}
