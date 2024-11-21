@@ -40,8 +40,8 @@ jobs:
         uses: actions/cache/save@v3
         with:
           path: ${{ steps.find-path.outputs.installation-dir }}
-          key: ${{ runner.os }}-foundry-${{ inputs.foundry-version }}
+          key: foundry-${{ inputs.foundry-version }}
       - name: Set cache key
         id: set-cache-key
         run: |
-          echo "cache-key=${{ runner.os }}-foundry-${{ inputs.foundry-version }}" >> "$GITHUB_OUTPUT"
+          echo "cache-key=foundry-${{ inputs.foundry-version }}" >> "$GITHUB_OUTPUT"
