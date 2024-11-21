@@ -29,6 +29,8 @@ jobs:
       - name: Echo the PR number to a file
         if: ${{ steps.has-cache.outputs.cache-hit != 'true' }}
         run: echo "${{ inputs.pr-number }}" > res.txt
+        # For saving the cache, it does not matter that the PR is not checked
+        # out. It uses the correct scope as far as I can tell.
       - name: Cache the PR number
         if: ${{ steps.has-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v3
