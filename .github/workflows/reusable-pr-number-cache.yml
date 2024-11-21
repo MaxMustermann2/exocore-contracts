@@ -19,9 +19,18 @@ jobs:
         run: |
           echo "Commit hash: ${{ inputs.commit-hash }}"
           echo "PR number: ${{ inputs.pr-number }}"
+      - name: Check if the cache exists
+        uses: actions/cache/restore@v3
+        id: has-cache
+        with:
+          key: pr-number-cache-${{ inputs.commit-hash }}
+          path: res.txt
+          lookup-only: true
       - name: Echo the PR number to a file
+        if: ${{ steps.has-cache.outputs.cache-hit != 'true' }}
         run: echo "${{ inputs.pr-number }}" > res.txt
       - name: Cache the PR number
+        if: ${{ steps.has-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v3
         with:
           key: pr-number-cache-${{ inputs.commit-hash }}
