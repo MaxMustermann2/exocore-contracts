@@ -15,7 +15,7 @@ jobs:
     name: Cache the PR number, if available
     uses: ./.github/workflows/reusable-pr-number-cache.yml
     with:
-      commit-hash: ${{ github.sha }}
+      commit-hash: ${{ github.event.pull_request.head.sha || github.event.after || github.sha }}
       pr-number: ${{ github.event.pull_request.number || 0 }}
 
   setup:
