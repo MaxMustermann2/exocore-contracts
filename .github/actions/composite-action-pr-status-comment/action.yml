@@ -18,7 +18,6 @@ inputs:
     required: true
 runs:
   using: "composite"
-  runs-on: ubuntu-latest
   steps:
     - name: Echo Workflow Details
       shell: bash

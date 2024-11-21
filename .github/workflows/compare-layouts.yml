@@ -57,6 +57,22 @@ jobs:
           workflow-name: "Storage layout comparison"
           github-token: ${{ secrets.GITHUB_TOKEN }}
           pr-number: ${{ needs.restore.outputs.pr-number }}
+      - name: Set commit status
+        # trigger is no matter what, because the status should be updated
+        if: always()
+        # this step would have been better located in forge-ci.yml, but since it needs the secret
+        # it is placed here.
+        run: |
+          curl -X POST \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -d '{
+              "state": "pending",
+              "context": "Compare Storage Layouts",
+              "description": "In progress...",
+              "target_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }' \
+            https://api.github.com/repos/${{ github.repository }}/statuses/${{ github.event.workflow_run.head_commit.id }}
       - name: Restore the cached output file
         if: ${{ github.event.workflow_run.conclusion == 'success' }}
         uses: actions/cache/restore@v3
@@ -160,13 +176,14 @@ jobs:
         # if the outcome is not set, it will post failure
         run: |
           outcome=$([[ "${{ steps.compare_layouts.outcome }}" == "success" ]] && echo "success" || echo "failure")
+          description=$([[ "${{ steps.compare_layouts.outcome }}" == "success" ]] && echo "Storage layouts match." || echo "Storage layouts do not match.")
           curl -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             -d '{
               "state": "'${outcome}'",
               "context": "Compare Storage Layouts",
-              "description": "Storage layout comparison results.",
+              "description": "'${description}'",
               "target_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }' \
             https://api.github.com/repos/${{ github.repository }}/statuses/${{ github.event.workflow_run.head_commit.id }}
