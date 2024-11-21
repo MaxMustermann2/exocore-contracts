@@ -1,0 +1,28 @@
+---
+name: Restore the cached PR number
+
+on:
+  workflow_call:
+    outputs:
+      pr-number:
+        description: The restored PR number from the cache
+        value: ${{ jobs.uncache.outputs.pr-number }}
+    inputs:
+      commit-hash:
+        required: true
+        type: string
+
+jobs:
+  uncache:
+    runs-on: ubuntu-latest
+    outputs:
+      pr-number: ${{ steps.restore.outputs.pr-number }}
+    steps:
+      - name: Restore the PR number cache
+        uses: actions/cache/restore@v3
+        with:
+          key: pr-number-cache-${{ inputs.commit-hash }}
+          path: res.txt
+      - name: Save the PR number to the outputs
+        id: restore
+        run: echo "pr-number=$(cat res.txt)" >> "$GITHUB_OUTPUT"

@@ -13,6 +13,9 @@ inputs:
   github-token:
     description: 'The GitHub token to use for making API requests.'
     required: true
+  pr-number:
+    description: 'The pull request number to comment on.'
+    required: true
 runs:
   using: "composite"
   steps:
@@ -21,7 +24,8 @@ runs:
       run: |
         echo "Workflow conclusion: ${{ inputs.workflow-conclusion }}"
         echo "Workflow name: ${{ inputs.workflow-name }}"
-        echo "Workflow URL: ::add-mask::${{ inputs.workflow-url }}"
+        echo "Workflow URL: ${{ inputs.workflow-url }}"
+        echo "PR number: ${{ inputs.pr-number }}"
     - name: Dump GitHub context
       shell: bash
       env:
@@ -35,53 +39,57 @@ runs:
           const workflowConclusion = "${{ inputs.workflow-conclusion }}";
           const workflowRunUrl = "${{ inputs.workflow-url }}";
           const workflowName = "${{ inputs.workflow-name }}";
-          const pullRequests = context.payload.workflow_run.pull_requests;
+          const prNumber = parseInt("${{ inputs.pr-number }}", 10);
 
-          if (pullRequests.length === 0) {
-            console.log('No pull requests associated with this workflow run.');
-          } else {
-            for (const pr of pullRequests) {
-              try {
-                const existingComments = await github.rest.issues.listComments({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: pr.number,
-                });
+          console.log(`Processing pull request #${prNumber}`);
+          console.log(`Commenting on the ${workflowName} workflow with status: ${workflowConclusion}`);
 
-                const existingComment = existingComments.data.find(comment =>
-                  comment.body.includes(`The ${workflowName} workflow`)
-                );
+          if (!prNumber) {
+            console.log("No valid pull request number provided. Skipping comment.");
+            return;
+          }
 
-                let commentBody;
+          try {
+            const existingComments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+            });
 
-                if (workflowConclusion === 'running') {
-                  commentBody = `🔄 The ${workflowName} workflow is currently running. Check the [workflow run](${workflowRunUrl}) for progress.`;
-                } else if (workflowConclusion === 'failure') {
-                  commentBody = `⚠️ The ${workflowName} workflow has failed! Check the [workflow run](${workflowRunUrl}) for details.`;
-                } else if (workflowConclusion === 'success') {
-                  commentBody = `✅ The ${workflowName} workflow has completed successfully. Check the [workflow run](${workflowRunUrl}) for details.`;
-                } else if (workflowConclusion === 'skipped') {
-                  commentBody = `⏭️ The ${workflowName} workflow was skipped. Check the [workflow run](${workflowRunUrl}) for details.`;
-                } else {
-                  commentBody = `❓ The ${workflowName} workflow has completed with an unknown status. Check the [workflow run](${workflowRunUrl}) for details.`;
-                }
-                if (existingComment) {
-                  await github.rest.issues.updateComment({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    comment_id: existingComment.id,
-                    body: commentBody,
-                  });
-                } else {
-                  await github.rest.issues.createComment({
-                    issue_number: pr.number,
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    body: commentBody,
-                  });
-                }
-              } catch (error) {
-                console.error(`Failed to comment on PR #${pr.number}: ${error.message}`);
-              }
+            const existingComment = existingComments.data.find(comment =>
+              comment.body.includes(`The ${workflowName} workflow`)
+            );
+
+            let commentBody;
+
+            if (workflowConclusion === 'running') {
+              commentBody = `🔄 The ${workflowName} workflow is currently running. Check the [workflow run](${workflowRunUrl}) for progress.`;
+            } else if (workflowConclusion === 'failure') {
+              commentBody = `⚠️ The ${workflowName} workflow has failed! Check the [workflow run](${workflowRunUrl}) for details.`;
+            } else if (workflowConclusion === 'success') {
+              commentBody = `✅ The ${workflowName} workflow has completed successfully. Check the [workflow run](${workflowRunUrl}) for details.`;
+            } else if (workflowConclusion === 'skipped') {
+              commentBody = `⏭️ The ${workflowName} workflow was skipped. Check the [workflow run](${workflowRunUrl}) for details.`;
+            } else {
+              console.log(`Unknown workflow conclusion: ${workflowConclusion}`);
+              commentBody = `❓ The ${workflowName} workflow has completed with an unknown status. Check the [workflow run](${workflowRunUrl}) for details.`;
             }
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingComment.id,
+                body: commentBody,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                issue_number: prNumber,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: commentBody,
+              });
+            }
+          } catch (error) {
+            console.error(`Failed to comment on PR #${prNumber} for workflow ${workflowName}: ${error.message}`);
+            throw error;
           }
