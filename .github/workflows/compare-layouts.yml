@@ -175,17 +175,25 @@ jobs:
         if: always()
         # if the outcome is not set, it will post failure
         run: |
-          outcome=$([[ "${{ steps.compare_layouts.outcome }}" == "success" ]] && echo "success" || echo "failure")
-          description=$([[ "${{ steps.compare_layouts.outcome }}" == "success" ]] && echo "Storage layouts match." || echo "Storage layouts do not match.")
+          outcome=$(
+            [[ "${{ steps.compare_layouts.outcome }}" == "success" ]] &&
+            echo "success" ||
+            echo "failure"
+          )
+          description=$(
+            [[ "$outcome" == "success" ]] &&
+            echo "Storage layouts match." ||
+            echo "Storage layouts do not match."
+          )
           curl -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
-            -d '{
-              "state": "'${outcome}'",
-              "context": "Compare Storage Layouts",
-              "description": "'${description}'",
-              "target_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            }' \
+            -d "{
+              \"state\": \"${outcome}\",
+              \"context\": \"Compare Storage Layouts\",
+              \"description\": \"${description}\",
+              \"target_url\": \"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
+            }" \
             https://api.github.com/repos/${{ github.repository }}/statuses/${{ github.event.workflow_run.head_commit.id }}
       - name: Exit with the correct code
         if: always()
