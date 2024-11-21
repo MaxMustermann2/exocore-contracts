@@ -36,7 +36,7 @@ jobs:
       # For the composite action to be available, we must checkout the repository.
       # Later, the repository is used to run the compareLayouts.js script.
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Restore the cached PR number, if available
         if: ${{ github.event.workflow_run.event == 'pull_request' }}
         uses: actions/cache/restore@v3
