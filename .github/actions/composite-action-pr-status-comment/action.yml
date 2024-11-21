@@ -26,6 +26,7 @@ runs:
       shell: bash
       env:
         GITHUB_CONTEXT: ${{ toJSON(github) }}
+      run: echo "$GITHUB_CONTEXT"
     - name: Comment on Pull Requests
       uses: actions/github-script@v6
       with:
