@@ -22,6 +22,10 @@ runs:
         echo "Workflow conclusion: ${{ inputs.workflow-conclusion }}"
         echo "Workflow name: ${{ inputs.workflow-name }}"
         echo "Workflow URL: ::add-mask::${{ inputs.workflow-url }}"
+    - name: Dump GitHub context
+      shell: bash
+      env:
+        GITHUB_CONTEXT: ${{ toJSON(github) }}
     - name: Comment on Pull Requests
       uses: actions/github-script@v6
       with:
