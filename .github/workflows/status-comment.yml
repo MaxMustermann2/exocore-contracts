@@ -9,6 +9,8 @@ on:
 permissions:
   pull-requests: write
   issues: read
+  # for cache restore
+  contents: read
 
 jobs:
   restore:
