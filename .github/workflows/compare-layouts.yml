@@ -62,7 +62,7 @@ jobs:
         uses: actions/cache/restore@v3
         with:
           path: res.txt
-          key: cache-${{ github.sha }}
+          key: cache-${{ github.event.workflow_run.head_commit.id	 }}
           fail-on-cache-miss: true
       - name: Load the outputs from the cached file
         if: ${{ github.event.workflow_run.conclusion == 'success' }}
@@ -119,7 +119,7 @@ jobs:
         uses: actions/cache/restore@v3
         with:
           path: storage-layouts.zip
-          key: storage-layouts-${{ github.sha }}
+          key: storage-layouts-${{ github.event.workflow_run.head_commit.id	 }}
       - name: Extract the restored layouts
         if: ${{ github.event.workflow_run.conclusion == 'success' }}
         run: unzip storage-layouts.zip
