@@ -2,7 +2,7 @@ name: Comment the status of the CI run on the pull request
 
 on:
   workflow_run:
-    workflows: ["Forge CI", "Slither Analysis", "Run `solhint` linter"]
+    workflows: ["Forge CI", "Slither Analysis", "Run `solhint` linter", "Compare Storage Layouts"]
     types:
       - completed
 
@@ -23,16 +23,51 @@ jobs:
           echo "Workflow run URL: ${{ github.event.workflow_run.html_url }}"
           echo "Commit SHA: ${{ github.event.workflow_run.head_commit.id }}"
           echo "Workflow Run ID: ${{ github.event.workflow_run.id }}"
-      # Checkout the repository to make the composite action available.
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Get PR number
+        id: pr-context
         if: ${{ github.event.workflow_run.event == 'pull_request' }}
-      # Finally, run the composite action to post/update the status comment.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_TARGET_REPO: ${{ github.repository }}
+          PR_BRANCH: |-
+            ${{
+              (github.event.workflow_run.head_repository.owner.login != github.event.workflow_run.repository.owner.login)
+                && format('{0}:{1}', github.event.workflow_run.head_repository.owner.login, github.event.workflow_run.head_branch)
+                || github.event.workflow_run.head_branch
+            }}
+        run: |
+          gh pr view --repo "${PR_TARGET_REPO}" "${PR_BRANCH}" \
+             --json 'number' --jq '"number=\(.number)"' \
+             >> "${GITHUB_OUTPUT}"
+      - name: Echo PR number
+        run: cat ${{ steps.pr-context.outputs.number }}
+        if: ${{ github.event.workflow_run.event == 'pull_request' }}
+      # Construct the message
+      - name: Set message
+        id: set-message
+        if: ${{ github.event.workflow_run.event == 'pull_request' }}
+        env:
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+          WORKFLOW_URL: ${{ github.event.workflow_run.html_url }}
+          WORKFLOW_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+        run: |
+          if [ "${{ github.event.workflow_run.conclusion }}" == "success" ]; then
+            message="✅ The $WORKFLOW_NAME workflow has completed successfully. Check the [workflow run]($WORKFLOW_URL) for details."
+          elif [ "${{ github.event.workflow_run.conclusion }}" == "failure" ]; then
+            message="❌ The $WORKFLOW_NAME workflow has failed! Check the [workflow run]($WORKFLOW_URL) for details."
+          elif [ "${{ github.event.workflow_run.conclusion }}" == "cancelled" ]; then
+            message="⏹️ The $WORKFLOW_NAME workflow was cancelled. Check the [workflow run]($WORKFLOW_URL) for details."
+          else
+            message="❓ The $WORKFLOW_NAME workflow has completed with an unknown status. Check the [workflow run]($WORKFLOW_URL) for details."
+          fi
+          echo "message=$message" >> "${GITHUB_OUTPUT}"
+      # Finally, post the status comment on the PR
       - name: Update CI Status
-        uses: ./.github/actions/composite-action-pr-status-comment
+        uses: marocchino/sticky-pull-request-comment@v2
         if: ${{ github.event.workflow_run.event == 'pull_request' }}
         with:
-          workflow-conclusion: ${{ github.event.workflow_run.conclusion }}
-          workflow-url: ${{ github.event.workflow_run.html_url }}
-          workflow-name: ${{ github.event.workflow_run.name }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          header: ${{ github.event.workflow_run.name }}
+          hide_and_recreate: true
+          hide_classify: "OUTDATED"
+          number: ${{ steps.pr-context.outputs.number }}
+          message: ${{ steps.set-message.outputs.message }}
