@@ -1,4 +1,4 @@
-name: Run `solhint` linter
+name: Solhint
 
 on:
   merge_group:
