@@ -7,8 +7,17 @@ on:
       - completed
 
 jobs:
+  setup:
+    # A full job can be used as a reusable workflow but not a step.
+    uses: ./.github/workflows/reusable-foundry-setup.yml
+    with:
+      # The below line does not accept environment variables,
+      # so it becomes the single source of truth for the version.
+      foundry-version: nightly
+
   # The actual job to compare the storage layouts.
   compare_storage_layouts:
+    needs: setup
     runs-on: ubuntu-latest
 
     permissions:
@@ -35,8 +44,7 @@ jobs:
           echo "Workflow Run ID: ${{ github.event.workflow_run.id }}"
       # The repository needs to be available for script/deployedContracts.json
       # and script/compareLayouts.js. We do not restore the build data because
-      # the compiled layouts are restored from cache and not rebuilt. This
-      # step is first to change the `scope` of the cache restore.
+      # the compiled layouts are restored from the artifact and not rebuilt.
       - name: Checkout the repository
         if: ${{ github.event.workflow_run.conclusion == 'success' }}
         uses: actions/checkout@v4
@@ -92,28 +100,16 @@ jobs:
           hide_details: true
           number: ${{ steps.pr-context.outputs.number }}
           message: ${{ steps.set-message.outputs.message }}
-      - name: Restore the cached output file
-        if: ${{ github.event.workflow_run.conclusion == 'success' }}
-        uses: actions/cache/restore@v3
-        with:
-          path: res.txt
-          key: cache-${{ github.event.workflow_run.head_commit.id	 }}
-      - name: Load the outputs from the cached file
-        if: ${{ github.event.workflow_run.conclusion == 'success' }}
-        id: load-outputs
-        run: |
-            echo "cache-key=$(cat res.txt | head -1)" >> "$GITHUB_OUTPUT"
-            echo "installation-dir=$(cat res.txt | tail -1)" >> "$GITHUB_OUTPUT"
       # The toolchain is needed to run `cast storage`
       - name: Restore cached Foundry toolchain
         if: ${{ github.event.workflow_run.conclusion == 'success' }}
         uses: actions/cache/restore@v3
         with:
-          key: ${{ steps.load-outputs.outputs.cache-key }}
-          path: ${{ steps.load-outputs.outputs.installation-dir }}
+          key: ${{ needs.setup.outputs.installation-dir }}
+          path: ${{ needs.setup.outputs.cache-key }}
       - name: Add Foundry to PATH
         if: ${{ github.event.workflow_run.conclusion == 'success' }}
-        run: echo "${{ steps.load-outputs.outputs.installation-dir }}" >> $GITHUB_PATH
+        run: echo "${{ needs.setup.outputs.installation-dir }}" >> $GITHUB_PATH
       - name: Fetch the deployed layouts
         if: ${{ github.event.workflow_run.conclusion == 'success' }}
         run: |
@@ -147,13 +143,12 @@ jobs:
             fi
           done
           cd "$pwd"
-      # Restore the layouts from the cache
-      - name: Restore the layout files from the previous job
+      # Restore the layouts from the previous job
+      - name: Restore the layout files from the artifact
         if: ${{ github.event.workflow_run.conclusion == 'success' }}
-        uses: actions/cache/restore@v3
+        uses: actions/download-artifact@v4
         with:
-          path: storage-layouts.zip
-          key: storage-layouts-${{ github.event.workflow_run.head_commit.id	 }}
+          name: storage-layouts-${{ github.event.workflow_run.head_commit.id }}
       - name: Extract the restored layouts
         if: ${{ github.event.workflow_run.conclusion == 'success' }}
         run: unzip storage-layouts.zip

@@ -165,20 +165,10 @@ jobs:
           for file in Bootstrap ClientChainGateway RewardVault Vault ExocoreGateway ExoCapsule; do
             forge inspect src/core/${file}.sol:${file} storage-layout > ${file}.compiled.json;
           done
-      # At this point, we will make our cache to send to another workflow, which will have access to the secrets.
       - name: Zip storage layout files
         run: zip storage-layouts.zip *.compiled.json ExocoreGateway.base.json
-      - name: Cache storage layout files
-        uses: actions/cache/save@v3
+      - name: Upload storage layout files as an artifact
+        uses: actions/upload-artifact@v4
         with:
           path: storage-layouts.zip
-          key: storage-layouts-${{ github.event.pull_request.head.sha || github.event.after || github.sha }}
-      - name: Store the cache output file
-        run: |
-          echo ${{ needs.build.outputs.cache-key }} > res.txt
-          echo ${{ needs.build.outputs.installation-dir }} >> res.txt
-      - name: Cache the output file
-        uses: actions/cache/save@v3
-        with:
-          path: res.txt
-          key: cache-${{ github.event.pull_request.head.sha || github.event.after || github.sha }}
+          name: storage-layouts-${{ github.event.pull_request.head.sha || github.event.after || github.sha }}
