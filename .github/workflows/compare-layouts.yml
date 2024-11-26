@@ -13,8 +13,6 @@ jobs:
 
     permissions:
       contents: read
-      # comment.yml inherits these permissions, so we need `write` here.
-      pull-requests: write
       # to mark the commit with the status
       statuses: write
 
@@ -33,22 +31,6 @@ jobs:
           echo "Workflow run URL: ${{ github.event.workflow_run.html_url }}"
           echo "Commit SHA: ${{ github.event.workflow_run.head_commit.id }}"
           echo "Workflow Run ID: ${{ github.event.workflow_run.id }}"
-      # For the composite action to be available, we must checkout the repository.
-      # Later, the repository is used to run the compareLayouts.js script.
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      # While the workflow is running or skipped, post a comment on the PR to indicate
-      # the status. This is done manually and not via `status-comment.yml` because it
-      # cannot detect `skipped` or `running` status; only `success` or failure. The
-      # former is important to post because it indicates a failure in `Forge CI` workflow.
-      - name: Post CI Status
-        if:  ${{ github.event.workflow_run.event == 'pull_request' }}
-        uses: ./.github/actions/composite-action-pr-status-comment
-        with:
-          workflow-conclusion:  ${{ github.event.workflow_run.conclusion == 'failure' && 'skipped' || 'running' }}
-          workflow-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          workflow-name: "Storage layout comparison"
-          github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Set commit status
         # trigger is no matter what, because the status should be updated
         if: always()
@@ -70,8 +52,7 @@ jobs:
         uses: actions/cache/restore@v3
         with:
           path: res.txt
-          key: cache-${{ github.sha }}
-          fail-on-cache-miss: true
+          key: cache-${{ github.event.workflow_run.head_commit.id	 }}
       - name: Load the outputs from the cached file
         if: ${{ github.event.workflow_run.conclusion == 'success' }}
         id: load-outputs
@@ -88,6 +69,12 @@ jobs:
       - name: Add Foundry to PATH
         if: ${{ github.event.workflow_run.conclusion == 'success' }}
         run: echo "${{ steps.load-outputs.outputs.installation-dir }}" >> $GITHUB_PATH
+      # The repository needs to be available for script/deployedContracts.json
+      # and script/compareLayouts.js. We do not restore the build data because
+      # the compiled layouts are restored from cache and not rebuilt.
+      - name: Checkout the repository
+        if: ${{ github.event.workflow_run.conclusion == 'success' }}
+        uses: actions/checkout@v4
       - name: Fetch the deployed layouts
         if: ${{ github.event.workflow_run.conclusion == 'success' }}
         run: |
@@ -127,7 +114,7 @@ jobs:
         uses: actions/cache/restore@v3
         with:
           path: storage-layouts.zip
-          key: storage-layouts-${{ github.sha }}
+          key: storage-layouts-${{ github.event.workflow_run.head_commit.id	 }}
       - name: Extract the restored layouts
         if: ${{ github.event.workflow_run.conclusion == 'success' }}
         run: unzip storage-layouts.zip
@@ -144,39 +131,24 @@ jobs:
         run: npm install @openzeppelin/upgrades-core
       - name: Compare the layouts
         if: ${{ github.event.workflow_run.conclusion == 'success' }}
-        id: compare_layouts
+        id: compare-layouts
         run: |
           node script/compareLayouts.js
         # Even if this fails, the CI status should be updated.
         continue-on-error: true
-      - name: Comment or update CI Status
-        # Only update the status if
-        # 1. The workflow run was triggered by a pull request
-        # 2. The triggering workflow run was successful
-        # We skip the case wherein the triggering workflow failed because
-        # it was already handled by the "Post CI Status" step.
-        # For why this is done manually and not via `status-comment.yml`,
-        # see the comment in the "Post CI Status" step.
-        if:  ${{ github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success' }}
-        uses: ./.github/actions/composite-action-pr-status-comment
-        with:
-          workflow-conclusion: ${{ steps.compare_layouts.outcome == 'success' && 'success' || 'failure' }}
-          workflow-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          workflow-name: "Storage layout comparison"
-          github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Update parent commit status
         if: always()
         # if the outcome is not set, it will post failure
         run:  |
           outcome=$(
-            [[ "${{ steps.compare_layouts.outcome }}" == "success" ]] &&
+            [[ "${{ steps.compare-layouts.outcome }}" == "success" ]] &&
             echo "success" ||
             echo "failure"
           )
           description=$(
             [[ "$outcome" == "success" ]] &&
-            echo "Storage layouts match." ||
-            echo "Storage layouts do not match."
+            echo "Storage layouts match" ||
+            echo "Storage layouts do not match"
           )
           curl -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
@@ -190,9 +162,10 @@ jobs:
             https://api.github.com/repos/${{ github.repository }}/statuses/${{ github.event.workflow_run.head_commit.id }}
       - name: Exit with the correct code
         if: always()
-        # if the outcome is not set, it will exit 1
+        # if the outcome is not set, it will exit 1. so, a failure in the parent job will
+        # result in a failure here.
         run: |
-          if [[ "${{ steps.compare_layouts.outcome }}" == "success" ]]; then
+          if [[ "${{ steps.compare-layouts.outcome }}" == "success" ]]; then
             exit 0
           else
             exit 1
