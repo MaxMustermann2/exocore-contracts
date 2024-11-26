@@ -11,17 +11,7 @@ on:
       - "*"
 
 jobs:
-  cache:
-    name: Cache the PR number, if available
-    uses: ./.github/workflows/reusable-pr-number-cache.yml
-    with:
-      commit-hash: ${{ github.event.pull_request.head.sha || github.event.after || github.sha }}
-      pr-number: ${{ github.event.pull_request.number || 0 }}
-
   setup:
-    # delay the job until the cache job is completed, so that the
-    # status can be commented on the PR.
-    needs: cache
     # A full job can be used as a reusable workflow.
     # However, individual steps cannot call a reusable workflow.
     # Instead, they can call a composite action.
@@ -64,7 +54,7 @@ jobs:
             ./out
             ./cache
             ./broadcast
-          key: build-${{ github.event.pull_request.head.sha || github.event.after || github.sha }}
+          key: build-${{ github.sha }}
 
   test:
     runs-on: ubuntu-latest
@@ -89,7 +79,7 @@ jobs:
             ./out
             ./cache
             ./broadcast
-          key: build-${{ github.event.pull_request.head.sha || github.event.after || github.sha }}
+          key: build-${{ github.sha }}
       - name: Test
         run: forge test -vvv
       - name: Set test snapshot as summary
@@ -118,7 +108,7 @@ jobs:
             ./out
             ./cache
             ./broadcast
-          key: build-${{ github.event.pull_request.head.sha || github.event.after || github.sha }}
+          key: build-${{ github.sha }}
       - name: Check formatting
         run: forge fmt --check
 
@@ -148,7 +138,7 @@ jobs:
         uses: actions/cache/save@v3
         with:
           path: ExocoreGateway.base.json
-          key: ExocoreGateway-base-layout-${{ github.event.pull_request.head.sha || github.event.after || github.sha }}
+          key: ExocoreGateway-base-layout-${{ github.sha }}
       # Now we can generate the layout for the PR level.
       - name: Checkout back to PR
         uses: actions/checkout@v4
@@ -164,14 +154,14 @@ jobs:
             ./out
             ./cache
             ./broadcast
-          key: build-${{ github.event.pull_request.head.sha || github.event.after || github.sha }}
+          key: build-${{ github.sha }}
       # This step restores the base branch layout file, while the next step generates the PR
       # branch layout files.
       - name: Restore base branch layout file
         uses: actions/cache/restore@v3
         with:
           path: ExocoreGateway.base.json
-          key: ExocoreGateway-base-layout-${{ github.event.pull_request.head.sha || github.event.after || github.sha }}
+          key: ExocoreGateway-base-layout-${{ github.sha }}
       - name: Generate storage layout files for the PR
         run: |
           for file in Bootstrap ClientChainGateway RewardVault Vault ExocoreGateway ExoCapsule; do
@@ -193,4 +183,4 @@ jobs:
         uses: actions/cache/save@v3
         with:
           path: res.txt
-          key: cache-${{ github.event.pull_request.head.sha || github.event.after || github.sha }}
+          key: cache-${{ github.sha }}

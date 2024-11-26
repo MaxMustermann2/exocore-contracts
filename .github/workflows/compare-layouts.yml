@@ -37,19 +37,6 @@ jobs:
       # Later, the repository is used to run the compareLayouts.js script.
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Restore the cached PR number, if available
-        if: ${{ github.event.workflow_run.event == 'pull_request' }}
-        uses: actions/cache/restore@v3
-        with:
-          key: pr-number-cache-${{ github.event.workflow_run.head_commit.id }}
-          path: res.txt
-      - name: Save the PR number to the outputs
-        id: restore
-        if: ${{ github.event.workflow_run.event == 'pull_request' }}
-        run: |
-          pr_number=$(cat res.txt)
-          echo "PR number: $pr_number"
-          echo "pr-number=$pr_number" >> "$GITHUB_OUTPUT"
       # The CI status needs to be posted explicitly because this
       # workflow is not triggered by a pull request, and hence,
       # the status is not visible under the "Checks" tab.
@@ -61,29 +48,12 @@ jobs:
           workflow-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           workflow-name: "Storage layout comparison"
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          pr-number: ${{ steps.restore.outputs.pr-number }}
-      - name: Set commit status
-        # trigger is no matter what, because the status should be updated
-        if: always()
-        # this step would have been better located in forge-ci.yml, but since it needs the secret
-        # it is placed here.
-        run: |
-          curl -X POST \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            -d '{
-              "state": "pending",
-              "context": "Compare Storage Layouts",
-              "description": "In progress...",
-              "target_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            }' \
-            https://api.github.com/repos/${{ github.repository }}/statuses/${{ github.event.workflow_run.head_commit.id }}
       - name: Restore the cached output file
         if: ${{ github.event.workflow_run.conclusion == 'success' }}
         uses: actions/cache/restore@v3
         with:
           path: res.txt
-          key: cache-${{ github.event.workflow_run.head_commit.id	 }}
+          key: cache-${{ github.sha }}
           fail-on-cache-miss: true
       - name: Load the outputs from the cached file
         if: ${{ github.event.workflow_run.conclusion == 'success' }}
@@ -140,7 +110,7 @@ jobs:
         uses: actions/cache/restore@v3
         with:
           path: storage-layouts.zip
-          key: storage-layouts-${{ github.event.workflow_run.head_commit.id	 }}
+          key: storage-layouts-${{ github.sha }}
       - name: Extract the restored layouts
         if: ${{ github.event.workflow_run.conclusion == 'success' }}
         run: unzip storage-layouts.zip
@@ -175,30 +145,20 @@ jobs:
           workflow-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           workflow-name: "Storage layout comparison"
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          pr-number: ${{ steps.restore.outputs.pr-number }}
       - name: Update parent commit status
         if: always()
         # if the outcome is not set, it will post failure
         run: |
-          outcome=$(
-            [[ "${{ steps.compare_layouts.outcome }}" == "success" ]] &&
-            echo "success" ||
-            echo "failure"
-          )
-          description=$(
-            [[ "$outcome" == "success" ]] &&
-            echo "Storage layouts match." ||
-            echo "Storage layouts do not match."
-          )
+          outcome=$([[ "${{ steps.compare_layouts.outcome }}" == "success" ]] && echo "success" || echo "failure")
           curl -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
-            -d "{
-              \"state\": \"${outcome}\",
-              \"context\": \"Compare Storage Layouts\",
-              \"description\": \"${description}\",
-              \"target_url\": \"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
-            }" \
+            -d '{
+              "state": "'${outcome}'",
+              "context": "Compare Storage Layouts",
+              "description": "Storage layout comparison results.",
+              "target_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }' \
             https://api.github.com/repos/${{ github.repository }}/statuses/${{ github.event.workflow_run.head_commit.id }}
       - name: Exit with the correct code
         if: always()

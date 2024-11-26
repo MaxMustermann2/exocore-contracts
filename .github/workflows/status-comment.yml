@@ -1,4 +1,4 @@
-name: Comment the triggering CI status on the PR
+name: Comment the status of the CI run on the pull request
 
 on:
   workflow_run:
@@ -9,14 +9,10 @@ on:
 permissions:
   pull-requests: write
   issues: read
-  # for cache restore
-  contents: read
 
 jobs:
   comment_status:
     runs-on: ubuntu-latest
-    outputs:
-      pr-number: ${{ steps.restore.outputs.pr-number }}
     steps:
       # Log the workflow trigger details for debugging.
       - name: Echo workflow trigger details
@@ -31,19 +27,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         if: ${{ github.event.workflow_run.event == 'pull_request' }}
-      - name: Restore the cached PR number, if available
-        if: ${{ github.event.workflow_run.event == 'pull_request' }}
-        uses: actions/cache/restore@v3
-        with:
-          key: pr-number-cache-${{ github.event.workflow_run.head_commit.id }}
-          path: res.txt
-      - name: Save the PR number to the outputs
-        id: restore
-        if: ${{ github.event.workflow_run.event == 'pull_request' }}
-        run: |
-          pr_number=$(cat res.txt)
-          echo "PR number: $pr_number"
-          echo "pr-number=$pr_number" >> "$GITHUB_OUTPUT"
       # Finally, run the composite action to post/update the status comment.
       - name: Update CI Status
         uses: ./.github/actions/composite-action-pr-status-comment
@@ -53,4 +36,3 @@ jobs:
           workflow-url: ${{ github.event.workflow_run.html_url }}
           workflow-name: ${{ github.event.workflow_run.name }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          pr-number: ${{ steps.restore.outputs.pr-number }}
