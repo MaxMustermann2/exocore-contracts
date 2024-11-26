@@ -132,11 +132,8 @@ jobs:
         # cache them.
         run: |
           forge inspect src/core/ExocoreGateway.sol:ExocoreGateway storage-layout > ExocoreGateway.base.json
-      - name: Cache base branch layout file
-        uses: actions/cache/save@v3
-        with:
-          path: ExocoreGateway.base.json
-          key: ExocoreGateway-base-layout-${{ github.event.pull_request.head.sha || github.event.after || github.sha }}
+      - name: Copy base branch layout file
+        run: cp ExocoreGateway.base.json /tmp/
       # Now we can generate the layout for the PR level.
       - name: Checkout back to PR
         uses: actions/checkout@v4
@@ -165,6 +162,8 @@ jobs:
           for file in Bootstrap ClientChainGateway RewardVault Vault ExocoreGateway ExoCapsule; do
             forge inspect src/core/${file}.sol:${file} storage-layout > ${file}.compiled.json;
           done
+      - name: Copy back base branch layout file
+        run: cp /tmp/ExocoreGateway.base.json ./ExocoreGateway.base.json
       - name: Zip storage layout files
         run: zip storage-layouts.zip *.compiled.json ExocoreGateway.base.json
       - name: Upload storage layout files as an artifact

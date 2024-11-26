@@ -105,8 +105,8 @@ jobs:
         if: ${{ github.event.workflow_run.conclusion == 'success' }}
         uses: actions/cache/restore@v3
         with:
-          key: ${{ needs.setup.outputs.installation-dir }}
-          path: ${{ needs.setup.outputs.cache-key }}
+          path: ${{ needs.setup.outputs.installation-dir }}
+          key: ${{ needs.setup.outputs.cache-key }}
       - name: Add Foundry to PATH
         if: ${{ github.event.workflow_run.conclusion == 'success' }}
         run: echo "${{ needs.setup.outputs.installation-dir }}" >> $GITHUB_PATH
