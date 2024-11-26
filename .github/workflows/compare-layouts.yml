@@ -69,6 +69,12 @@ jobs:
       - name: Add Foundry to PATH
         if: ${{ github.event.workflow_run.conclusion == 'success' }}
         run: echo "${{ steps.load-outputs.outputs.installation-dir }}" >> $GITHUB_PATH
+      # The repository needs to be available for script/deployedContracts.json
+      # and script/compareLayouts.js. We do not restore the build data because
+      # the compiled layouts are restored from cache and not rebuilt.
+      - name: Checkout the repository
+        if: ${{ github.event.workflow_run.conclusion == 'success' }}
+        uses: actions/checkout@v4
       - name: Fetch the deployed layouts
         if: ${{ github.event.workflow_run.conclusion == 'success' }}
         run: |
