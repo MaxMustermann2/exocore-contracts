@@ -31,6 +31,25 @@ jobs:
           echo "Workflow run URL: ${{ github.event.workflow_run.html_url }}"
           echo "Commit SHA: ${{ github.event.workflow_run.head_commit.id }}"
           echo "Workflow Run ID: ${{ github.event.workflow_run.id }}"
+      - name: Get PR number
+        id: pr-context
+        if: ${{ github.event.workflow_run.event == 'pull_request' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_TARGET_REPO: ${{ github.repository }}
+          PR_BRANCH: |-
+            ${{
+              (github.event.workflow_run.head_repository.owner.login != github.event.workflow_run.repository.owner.login)
+                && format('{0}:{1}', github.event.workflow_run.head_repository.owner.login, github.event.workflow_run.head_branch)
+                || github.event.workflow_run.head_branch
+            }}
+        run: |
+          gh pr view --repo "${PR_TARGET_REPO}" "${PR_BRANCH}" \
+              --json 'number' --jq '"number=\(.number)"' \
+              >> "${GITHUB_OUTPUT}"
+      - name: Echo PR number
+        run: echo ${{ steps.pr-context.outputs.number }}
+        if: ${{ github.event.workflow_run.event == 'pull_request' }}
       - name: Set commit status
         # trigger is no matter what, because the status should be updated
         if: always()
@@ -47,6 +66,23 @@ jobs:
               "target_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }' \
             https://api.github.com/repos/${{ github.repository }}/statuses/${{ github.event.workflow_run.head_commit.id }}
+      - name: Set message
+        id: set-message
+        env:
+          WORKFLOW_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          WORKFLOW_NAME: ${{ github.workflow }}
+          SHA: ${{ github.event.workflow_run.head_commit.id }}
+        run: |
+          message="🚀 The $WORKFLOW_NAME workflow has started."
+          echo "message=$message Check the [workflow run]($WORKFLOW_URL) for progress. ($SHA)" >> "${GITHUB_OUTPUT}"
+      - name: Update CI Status
+        uses: marocchino/sticky-pull-request-comment@v2
+        if: ${{ github.event.workflow_run.event == 'pull_request' }}
+        with:
+          header: ${{ github.workflow }}
+          hide_details: true
+          number: ${{ steps.pr-context.outputs.number }}
+          message: ${{ steps.set-message.outputs.message }}
       - name: Restore the cached output file
         if: ${{ github.event.workflow_run.conclusion == 'success' }}
         uses: actions/cache/restore@v3
@@ -160,6 +196,27 @@ jobs:
               \"target_url\": \"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
             }" \
             https://api.github.com/repos/${{ github.repository }}/statuses/${{ github.event.workflow_run.head_commit.id }}
+      - name: Set message again
+        id: set-message-again
+        env:
+          WORKFLOW_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          WORKFLOW_NAME: ${{ github.workflow }}
+          SHA: ${{ github.event.workflow_run.head_commit.id }}
+        run: |
+          if [ ${{ steps.compare-layouts.outcome }} == "success" ]; then
+            message="✅ The $WORKFLOW_NAME workflow has completed successfully."
+          else
+            message="❌ The $WORKFLOW_NAME workflow has failed!"
+          fi
+          echo "message=$message Check the [workflow run]($WORKFLOW_URL) for details. ($SHA)" >> "${GITHUB_OUTPUT}"
+      - name: Update CI Status
+        uses: marocchino/sticky-pull-request-comment@v2
+        if: ${{ github.event.workflow_run.event == 'pull_request' }}
+        with:
+          header: ${{ github.workflow }}
+          hide_details: true
+          number: ${{ steps.pr-context.outputs.number }}
+          message: ${{ steps.set-message-again.outputs.message }}
       - name: Exit with the correct code
         if: always()
         # if the outcome is not set, it will exit 1. so, a failure in the parent job will
