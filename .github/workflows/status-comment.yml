@@ -5,7 +5,7 @@ on:
     workflows:
       - "Forge CI"
       - "Slither Analysis"
-      - "Run `solhint` linter"
+      - "Solhint"
       # Nested workflow_run is not supported, so this doesn't work. Instead
       # that workflow should make comments by itself.
       # - "Compare Storage Layouts"
