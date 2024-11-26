@@ -1,4 +1,4 @@
-name: Comment the status of the CI run on the pull request
+name: Comment CI status on PR
 
 on:
   workflow_run:
@@ -6,7 +6,9 @@ on:
       - "Forge CI"
       - "Slither Analysis"
       - "Run `solhint` linter"
-      - "Compare Storage Layouts"
+      # Nested workflow_run is not supported, so this doesn't work. Instead
+      # that workflow should make comments by itself.
+      # - "Compare Storage Layouts"
     types:
       - completed
       - requested
@@ -59,24 +61,23 @@ jobs:
           SHA: ${{ github.event.workflow_run.head_commit.id }}
         run: |
           if [ "${{ github.event.action }}" == "requested" ]; then
-            message="🚀 The $WORKFLOW_NAME workflow has started. Check the [workflow run]($WORKFLOW_URL) for progress."
+            message="🚀 The $WORKFLOW_NAME workflow has started."
           elif [ "${{ github.event.workflow_run.conclusion }}" == "success" ]; then
-            message="✅ The $WORKFLOW_NAME workflow has completed successfully. Check the [workflow run]($WORKFLOW_URL) for details."
+            message="✅ The $WORKFLOW_NAME workflow has completed successfully."
           elif [ "${{ github.event.workflow_run.conclusion }}" == "failure" ]; then
-            message="❌ The $WORKFLOW_NAME workflow has failed! Check the [workflow run]($WORKFLOW_URL) for details."
+            message="❌ The $WORKFLOW_NAME workflow has failed!"
           elif [ "${{ github.event.workflow_run.conclusion }}" == "cancelled" ]; then
-            message="⏹️ The $WORKFLOW_NAME workflow was cancelled. Check the [workflow run]($WORKFLOW_URL) for details."
+            message="⏹️ The $WORKFLOW_NAME workflow was cancelled."
           else
-            message="❓ The $WORKFLOW_NAME workflow has completed with an unknown status. Check the [workflow run]($WORKFLOW_URL) for details."
+            message="❓ The $WORKFLOW_NAME workflow has completed with an unknown status."
           fi
-          echo "message=$message ($SHA)" >> "${GITHUB_OUTPUT}"
+          echo "message=$message Check the [workflow run]($WORKFLOW_URL) for details. ($SHA)" >> "${GITHUB_OUTPUT}"
       # Finally, post the status comment on the PR
       - name: Update CI Status
         uses: marocchino/sticky-pull-request-comment@v2
         if: ${{ github.event.workflow_run.event == 'pull_request' }}
         with:
           header: ${{ github.event.workflow_run.name }}
-          hide_and_recreate: true
-          hide_classify: "OUTDATED"
+          hide_details: true
           number: ${{ steps.pr-context.outputs.number }}
           message: ${{ steps.set-message.outputs.message }}
