@@ -37,9 +37,10 @@ jobs:
       # Later, the repository is used to run the compareLayouts.js script.
       - name: Checkout repository
         uses: actions/checkout@v4
-      # The CI status needs to be posted explicitly because this
-      # workflow is not triggered by a pull request, and hence,
-      # the status is not visible under the "Checks" tab.
+      # While the workflow is running or skipped, post a comment on the PR to indicate
+      # the status. This is done manually and not via `status-comment.yml` because it
+      # cannot detect `skipped` or `running` status; only `success` or failure. The
+      # former is important to post because it indicates a failure in `Forge CI` workflow.
       - name: Post CI Status
         if:  ${{ github.event.workflow_run.event == 'pull_request' }}
         uses: ./.github/actions/composite-action-pr-status-comment
@@ -48,6 +49,22 @@ jobs:
           workflow-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           workflow-name: "Storage layout comparison"
           github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set commit status
+        # trigger is no matter what, because the status should be updated
+        if: always()
+        # this step would have been better located in forge-ci.yml, but since it needs the secret
+        # it is placed here. first, it is updated to pending here and failure/success is updated later.
+        run: |
+          curl -X POST \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -d '{
+              "state": "pending",
+              "context": "Compare Storage Layouts",
+              "description": "In progress...",
+              "target_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }' \
+            https://api.github.com/repos/${{ github.repository }}/statuses/${{ github.event.workflow_run.head_commit.id }}
       - name: Restore the cached output file
         if: ${{ github.event.workflow_run.conclusion == 'success' }}
         uses: actions/cache/restore@v3
@@ -138,6 +155,8 @@ jobs:
         # 2. The triggering workflow run was successful
         # We skip the case wherein the triggering workflow failed because
         # it was already handled by the "Post CI Status" step.
+        # For why this is done manually and not via `status-comment.yml`,
+        # see the comment in the "Post CI Status" step.
         if:  ${{ github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success' }}
         uses: ./.github/actions/composite-action-pr-status-comment
         with:
@@ -148,17 +167,26 @@ jobs:
       - name: Update parent commit status
         if: always()
         # if the outcome is not set, it will post failure
-        run: |
-          outcome=$([[ "${{ steps.compare_layouts.outcome }}" == "success" ]] && echo "success" || echo "failure")
+        run:  |
+          outcome=$(
+            [[ "${{ steps.compare_layouts.outcome }}" == "success" ]] &&
+            echo "success" ||
+            echo "failure"
+          )
+          description=$(
+            [[ "$outcome" == "success" ]] &&
+            echo "Storage layouts match." ||
+            echo "Storage layouts do not match."
+          )
           curl -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
-            -d '{
-              "state": "'${outcome}'",
-              "context": "Compare Storage Layouts",
-              "description": "Storage layout comparison results.",
-              "target_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            }' \
+            -d "{
+              \"state\": \"${outcome}\",
+              \"context\": \"Compare Storage Layouts\",
+              \"description\": \"${description}\",
+              \"target_url\": \"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
+            }" \
             https://api.github.com/repos/${{ github.repository }}/statuses/${{ github.event.workflow_run.head_commit.id }}
       - name: Exit with the correct code
         if: always()
