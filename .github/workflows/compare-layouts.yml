@@ -6,6 +6,11 @@ on:
     types:
       - completed
 
+permissions:
+  contents: read
+  statuses: write
+  pull-requests: write
+
 jobs:
   # Do this job first so that the commit status is updated to pending ASAP.
   set-commit-status:
@@ -40,13 +45,6 @@ jobs:
   compare-storage-layouts:
     needs: setup
     runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-      # to mark the commit with the status
-      statuses: write
-      # since status-comment.yml does not support this, we comment things manually
-      pull-requests: write
 
     env:
       ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
