@@ -47,9 +47,6 @@ jobs:
           gh pr view --repo "${PR_TARGET_REPO}" "${PR_BRANCH}" \
              --json 'number' --jq '"number=\(.number)"' \
              >> "${GITHUB_OUTPUT}"
-      - name: Echo PR number
-        run: echo ${{ steps.pr-context.outputs.number }}
-        if: ${{ github.event.workflow_run.event == 'pull_request' }}
       # Construct the message
       - name: Set message
         id: set-message

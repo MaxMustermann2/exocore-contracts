@@ -19,6 +19,8 @@ jobs:
       - name: Set commit status
         # trigger is no matter what, because the status should be updated
         if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # this step would have been better located in forge-ci.yml, but since it needs the secret
         # it is placed here. first, it is updated to pending here and failure/success is updated later.
         run: |
@@ -38,7 +40,8 @@ jobs:
     uses: ./.github/workflows/reusable-foundry-setup.yml
     with:
       # The below line does not accept environment variables,
-      # so it becomes the single source of truth for the version.
+      # so it becomes the single source of truth for the version, within this workflow.
+      # Any `pinning` of the version should be done here and forge-ci.yml.
       foundry-version: nightly
 
   # The actual job to compare the storage layouts.
@@ -83,9 +86,6 @@ jobs:
           gh pr view --repo "${PR_TARGET_REPO}" "${PR_BRANCH}" \
               --json 'number' --jq '"number=\(.number)"' \
               >> "${GITHUB_OUTPUT}"
-      - name: Echo PR number
-        run: echo ${{ steps.pr-context.outputs.number }}
-        if: ${{ github.event.workflow_run.event == 'pull_request' }}
       - name: Set message
         id: set-message
         env:
