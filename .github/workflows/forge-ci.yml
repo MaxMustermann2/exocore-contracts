@@ -67,8 +67,6 @@ jobs:
         run: echo "${{ needs.build.outputs.installation-dir }}" >> $GITHUB_PATH
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
       - name: Restore build artifacts
         uses: actions/cache/restore@v3
         with:
@@ -96,8 +94,6 @@ jobs:
         run: echo "${{ needs.build.outputs.installation-dir }}" >> $GITHUB_PATH
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
       - name: Restore build artifacts
         uses: actions/cache/restore@v3
         with:
@@ -125,6 +121,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.base.ref || github.event.before }}
+          # We don't have a `lib` folder to restore for this step, so we
+          # recursively checkout the submodules. In other steps, we use the
+          # `lib` folder from the `build` job.
           submodules: recursive
       - name: Generate base branch layout file
         # Note that this `run` will do a `forge build` so we don't need to do it ourselves.
@@ -139,7 +138,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-          submodules: recursive
       # Restoring these will help make `forge inspect` faster.
       - name: Restore build artifacts
         uses: actions/cache/restore@v3
