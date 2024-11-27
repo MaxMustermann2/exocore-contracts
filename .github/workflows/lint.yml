@@ -14,15 +14,17 @@ jobs:
   lint:
     strategy:
       fail-fast: true
+    # No more than a few minutes
+    timeout-minutes: 5
 
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '18' # Latest LTS
 
       - name: Clear npm cache
         run: npm cache clean --force
