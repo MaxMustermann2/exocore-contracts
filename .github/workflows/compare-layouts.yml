@@ -7,6 +7,27 @@ on:
       - completed
 
 jobs:
+  # Do this job first so that the commit status is updated to pending ASAP.
+  set-commit-status:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set commit status
+        # trigger is no matter what, because the status should be updated
+        if: always()
+        # this step would have been better located in forge-ci.yml, but since it needs the secret
+        # it is placed here. first, it is updated to pending here and failure/success is updated later.
+        run: |
+          curl -X POST \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -d '{
+              "state": "pending",
+              "context": "Compare Storage Layouts",
+              "description": "In progress...",
+              "target_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }' \
+            https://api.github.com/repos/${{ github.repository }}/statuses/${{ github.event.workflow_run.head_commit.id }}
+
   setup:
     # A full job can be used as a reusable workflow but not a step.
     uses: ./.github/workflows/reusable-foundry-setup.yml
@@ -16,7 +37,7 @@ jobs:
       foundry-version: nightly
 
   # The actual job to compare the storage layouts.
-  compare_storage_layouts:
+  compare-storage-layouts:
     needs: setup
     runs-on: ubuntu-latest
 
@@ -67,22 +88,6 @@ jobs:
       - name: Echo PR number
         run: echo ${{ steps.pr-context.outputs.number }}
         if: ${{ github.event.workflow_run.event == 'pull_request' }}
-      - name: Set commit status
-        # trigger is no matter what, because the status should be updated
-        if: always()
-        # this step would have been better located in forge-ci.yml, but since it needs the secret
-        # it is placed here. first, it is updated to pending here and failure/success is updated later.
-        run: |
-          curl -X POST \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            -d '{
-              "state": "pending",
-              "context": "Compare Storage Layouts",
-              "description": "In progress...",
-              "target_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            }' \
-            https://api.github.com/repos/${{ github.repository }}/statuses/${{ github.event.workflow_run.head_commit.id }}
       - name: Set message
         id: set-message
         env:
@@ -174,16 +179,18 @@ jobs:
       - name: Update parent commit status
         if: always()
         # if the outcome is not set, it will post failure
-        run:  |
+        run: |
           outcome=$(
             [[ "${{ steps.compare-layouts.outcome }}" == "success" ]] &&
             echo "success" ||
             echo "failure"
           )
           description=$(
-            [[ "$outcome" == "success" ]] &&
+            [[ "${{ steps.compare-layouts.outcome }}" == "success" ]] &&
             echo "Storage layouts match" ||
-            echo "Storage layouts do not match"
+            ([[ "${{ steps.compare-layouts.outcome }}" == "failure" ]] &&
+            echo "Storage layouts do not match" ||
+            echo "Job skipped since ${{ github.event.workflow_run.name }} failed.")
           )
           curl -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
