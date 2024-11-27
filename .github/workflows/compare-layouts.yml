@@ -146,9 +146,13 @@ jobs:
       # Restore the layouts from the previous job
       - name: Restore the layout files from the artifact
         if: ${{ github.event.workflow_run.conclusion == 'success' }}
-        uses: actions/download-artifact@v4
+        uses: dawidd6/action-download-artifact@v6
         with:
           name: storage-layouts-${{ github.event.workflow_run.head_commit.id }}
+          run_id: ${{ github.event.workflow_run.id }}
+      - name: Debug the restored layouts
+        if: ${{ github.event.workflow_run.conclusion == 'success' }}
+        run: ls -l
       - name: Extract the restored layouts
         if: ${{ github.event.workflow_run.conclusion == 'success' }}
         run: unzip storage-layouts.zip
