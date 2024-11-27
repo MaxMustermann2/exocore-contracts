@@ -209,8 +209,10 @@ jobs:
         run: |
           if [ ${{ steps.compare-layouts.outcome }} == "success" ]; then
             message="✅ The $WORKFLOW_NAME workflow has completed successfully."
-          else
+          elif [ ${{ steps.compare-layouts.outcome }} == "failure" ]; then
             message="❌ The $WORKFLOW_NAME workflow has failed!"
+          else
+            message="⏭ The $WORKFLOW_NAME workflow was skipped."
           fi
           echo "message=$message Check the [workflow run]($WORKFLOW_URL) for details. ($SHA)" >> "${GITHUB_OUTPUT}"
       - name: Update CI Status
