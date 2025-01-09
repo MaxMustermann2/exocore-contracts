@@ -46,7 +46,7 @@ jobs:
           submodules: recursive
       - name: Build
         run: forge build
-      - name: Cache build
+      - name: Cache `forge build` results
         uses: actions/cache/save@v3
         with:
           path: |
@@ -246,6 +246,9 @@ jobs:
         if: ${{ matrix.base }}
       - name: Restore `forge build` results
         uses: actions/cache/restore@v3
+        # The restoration can only happen for the non-base case. For the base case,
+        # the context is different and anything created within the PR context will
+        # not be available to the cache restore action.
         if: ${{ !matrix.base }}
         with:
           path: |
@@ -253,13 +256,6 @@ jobs:
             ./out
             ./cache
             ./broadcast
-          key: build-${{ github.event.pull_request.head.sha || github.event.after || github.sha }}
-      - name: Restore `lib` folder
-        uses: actions/cache/restore@v3
-        if: ${{ matrix.base }}
-        with:
-          path: |
-            ./lib
           key: build-${{ github.event.pull_request.head.sha || github.event.after || github.sha }}
       - name: Generate storage layout file
         id: generate-storage-layout
