@@ -228,7 +228,6 @@ jobs:
             base: false
           - contract: ExoCapsule
             base: false
-
     steps:
       - name: Restore cached Foundry toolchain
         uses: actions/cache/restore@v3
@@ -261,7 +260,7 @@ jobs:
         with:
           path: |
             ./lib
-          key: build-${{ github.event.pull_request.base.sha || github.event.before }}
+          key: build-${{ github.event.pull_request.head.sha || github.event.after || github.sha }}
       - name: Generate storage layout file
         id: generate-storage-layout
         run: |
