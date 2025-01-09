@@ -243,6 +243,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.base.ref || github.event.before }}
+          submodules: recursive
         if: ${{ matrix.base }}
       - name: Restore `forge build` results
         uses: actions/cache/restore@v3
