@@ -46,7 +46,7 @@ jobs:
           submodules: recursive
       - name: Build
         run: forge build
-      - name: Cache build artifacts
+      - name: Cache build
         uses: actions/cache/save@v3
         with:
           path: |
@@ -71,7 +71,7 @@ jobs:
         run: echo "${{ needs.build.outputs.installation-dir }}" >> "$GITHUB_PATH"
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Restore build artifacts
+      - name: Restore `forge build` results
         uses: actions/cache/restore@v3
         with:
           path: |
@@ -107,7 +107,7 @@ jobs:
         run: echo "${{ needs.build.outputs.installation-dir }}" >> "$GITHUB_PATH"
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Restore build artifacts
+      - name: Restore `forge build` results
         uses: actions/cache/restore@v3
         with:
           path: |
@@ -203,47 +203,18 @@ jobs:
           name: validated-contracts-${{ github.event.pull_request.head.sha || github.event.after || github.sha }}
           path: validatedContracts.json
 
-  extract-base-storage-layout-exocore-gateway:
-    # Takes less than 30 seconds, but add some margin for git clone
-    timeout-minutes: 10
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Restore cached Foundry toolchain
-        uses: actions/cache/restore@v3
-        with:
-          path: ${{ needs.build.outputs.installation-dir }}
-          key: ${{ needs.build.outputs.cache-key }}
-      - name: Add Foundry to PATH
-        run: echo "${{ needs.build.outputs.installation-dir }}" >> "$GITHUB_PATH"
-      - name: Checkout base branch or previous commit
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.base.ref || github.event.before }}
-          # We don't have a `lib` folder to restore for this step, so we
-          # recursively checkout the submodules. In other steps, we use the
-          # `lib` folder from the `build` job.
-          submodules: recursive
-      - name: Generate base branch layout file
-        # Note that this `run` will do a `forge build` so we don't need to do it ourselves.
-        # The build artifacts of this step are not relevant to us either, so we don't need to
-        # cache them.
-        run: |
-          forge inspect --json src/core/ExocoreGateway.sol:ExocoreGateway storage-layout > ExocoreGateway.base.json
-      - name: Upload storage layout file as an artifact
-        uses: actions/upload-artifact@v4
-        with:
-          path: ExocoreGateway.base.json
-          name: compiled-layout-ExocoreGateway-base-${{ github.event.pull_request.base.sha || github.event.after || github.sha }}
-
   extract-storage-layout:
-    # Takes less than 30 seconds
+    # Takes less than 30 seconds per matrix member
     timeout-minutes: 5
     runs-on: ubuntu-latest
     needs: build
+    outputs:
+      storage-layout-file: ${{ steps.generate-storage-layout.outputs.output-file }}
+      artifact-name: ${{ steps.generate-storage-layout.outputs.artifact-name }}
     strategy:
       matrix:
-        contract: [Bootstrap, ClientChainGateway, RewardVault, Vault, ExocoreGateway, ExoCapsule]
+        contract: [Bootstrap, ClientChainGateway, RewardVault, Vault, ExocoreGateway, ExoCapsule, ExocoreGateway]
+        base: [false, false, false, false, false, false, true]
     steps:
       - name: Restore cached Foundry toolchain
         uses: actions/cache/restore@v3
@@ -254,8 +225,15 @@ jobs:
         run: echo "${{ needs.build.outputs.installation-dir }}" >> "$GITHUB_PATH"
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Restore build artifacts
+        if: ${{ !matrix.base }}
+      - name: Checkout base branch of repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref || github.event.before }}
+        if: ${{ matrix.base }}
+      - name: Restore `forge build` results
         uses: actions/cache/restore@v3
+        if: ${{ !matrix.base }}
         with:
           path: |
             ./lib
@@ -263,27 +241,45 @@ jobs:
             ./cache
             ./broadcast
           key: build-${{ github.event.pull_request.head.sha || github.event.after || github.sha }}
-      - name: Generate storage layout file for ${{ matrix.contract }}
+      - name: Restore `lib` folder
+        uses: actions/cache/restore@v3
+        if: ${{ matrix.base }}
+        with:
+          path: |
+            ./lib
+          key: build-${{ github.event.pull_request.base.sha || github.event.before }}
+      - name: Generate storage layout file
+        id: generate-storage-layout
         run: |
-          forge inspect --json src/core/${{ matrix.contract }}.sol:${{ matrix.contract }} storage-layout > ${{ matrix.contract }}.compiled.json;
+          artifact_name="compiled-layout-${{ matrix.contract }}"
+          if [ "${{ matrix.base }}" = "true" ]; then
+            output_file="${{ matrix.contract }}.base.json"
+            artifact_name="${artifact_name}-base"
+          else
+            output_file="${{ matrix.contract }}.current.json"
+            artifact_name="${artifact_name}-current"
+          fi
+          artifact_name="${artifact_name}-${{ github.event.pull_request.head.sha || github.event.after || github.sha }}"
+          forge inspect --json src/core/${{ matrix.contract }}.sol:${{ matrix.contract }} storage-layout > $output_file
+          echo "output-file=$output_file" >> "$GITHUB_OUTPUT"
+          echo "artifact-name=$artifact_name" >> "$GITHUB_OUTPUT"
       - name: Upload storage layout file as an artifact
         uses: actions/upload-artifact@v4
         with:
-          path: ${{ matrix.contract }}.compiled.json
-          name: compiled-layout-${{ matrix.contract}}-${{ github.event.pull_request.head.sha || github.event.after || github.sha }}
+          path: ${{ steps.generate-storage-layout.outputs.output-file }}
+          name: ${{ steps.generate-storage-layout.outputs.artifact-name }}
 
   combine-storage-layouts:
     # Takes less than 10 seconds
     timeout-minutes: 5
     runs-on: ubuntu-latest
     needs:
-      - extract-base-storage-layout-exocore-gateway
       - extract-storage-layout
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
-        # No name means all artifacts are downloaded within their respective subfolders
-        # inside the provided path.
+        # No name means all artifacts created by this workflow are downloaded
+        # within their respective subfolders (paths) inside the provided path (`combined`).
         with:
           path: combined
       - name: Zip up the compiled layouts
