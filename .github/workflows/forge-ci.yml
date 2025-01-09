@@ -293,7 +293,7 @@ jobs:
         with:
           path: combined
       - name: Zip up the compiled layouts
-        run: zip -j compiled-layouts.zip combined/*/*.json --exclude combined/*/validatedContracts.json
+        run: find combined -type f -name "*.json" ! -name "validatedContracts.json" -exec zip -j compiled-layouts.zip {} +
       - name: Upload the compiled layouts file as an artifact
         uses: actions/upload-artifact@v4
         with:
