@@ -213,8 +213,22 @@ jobs:
       artifact-name: ${{ steps.generate-storage-layout.outputs.artifact-name }}
     strategy:
       matrix:
-        contract: [Bootstrap, ClientChainGateway, RewardVault, Vault, ExocoreGateway, ExoCapsule, ExocoreGateway]
-        base: [false, false, false, false, false, false, true]
+        include:
+          - contract: ExocoreGateway
+            base: true
+          - contract: Bootstrap
+            base: false
+          - contract: ClientChainGateway
+            base: false
+          - contract: RewardVault
+            base: false
+          - contract: Vault
+            base: false
+          - contract: ExocoreGateway
+            base: false
+          - contract: ExoCapsule
+            base: false
+
     steps:
       - name: Restore cached Foundry toolchain
         uses: actions/cache/restore@v3
