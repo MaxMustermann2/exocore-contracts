@@ -266,8 +266,8 @@ jobs:
             output_file="${{ matrix.contract }}.base.json"
             artifact_name="${artifact_name}-base"
           else
-            output_file="${{ matrix.contract }}.current.json"
-            artifact_name="${artifact_name}-current"
+            output_file="${{ matrix.contract }}.proposed.json"
+            artifact_name="${artifact_name}-proposed"
           fi
           artifact_name="${artifact_name}-${{ github.event.pull_request.head.sha || github.event.after || github.sha }}"
           forge inspect --json src/core/${{ matrix.contract }}.sol:${{ matrix.contract }} storage-layout > $output_file
